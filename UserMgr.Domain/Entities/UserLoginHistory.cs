@@ -14,9 +14,8 @@ public record UserLoginHistory
     public string Message { get; init; }
     private UserLoginHistory(){}
 
-    public UserLoginHistory(long id, Guid? userId, PhoneNumber phoneNumber, string message)
+    public UserLoginHistory(Guid? userId, PhoneNumber phoneNumber, string message)
     {
-        Id = id;
         UserId = userId;
         PhoneNumber = phoneNumber;
         CreateDateTime = DateTime.Now;

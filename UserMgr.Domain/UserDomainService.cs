@@ -6,6 +6,7 @@ namespace UserMgr.Domain;
 
 /// <summary>
 /// 領域層服務
+/// 主要的業務邏輯寫在這裡
 /// </summary>
 public class UserDomainService
 {
@@ -18,27 +19,38 @@ public class UserDomainService
         _smsCodeSender = smsCodeSender;
     }
 
-    public async Task<UserAccessResult> CheckPassword(PhoneNumber phoneNumber, string password)
+    /// <summary>
+    /// 使用者登入檢驗
+    /// </summary>
+    /// <param name="phoneNumber"></param>
+    /// <param name="password"></param>
+    /// <returns></returns>
+    public async Task<UserAccessResult> CheckLoginAsync(PhoneNumber phoneNumber, string password)
     {
         var user = await _userRepository.FindOneAsync(phoneNumber);
         UserAccessResult result;
+        // 找不到使用者
         if (user == null)
         {
             result = UserAccessResult.PhoneNumberNotFound;
         }
+        // 使用者被鎖定
         else if (IsLockOut(user))
         {
             result = UserAccessResult.LockOut;
         }
+        // 未設置密碼
         else if (!user.HasPassword())
         {
             result = UserAccessResult.NoPassword;
         }
+        // 密碼正確
         else if (user.CheckPassword(password))
         {
             result = UserAccessResult.Ok;
             this.ResetAccessFail(user);
         }
+        // 密碼錯誤
         else
         {
             result = UserAccessResult.PasswordError;
@@ -50,7 +62,13 @@ public class UserDomainService
         return result;
     }
 
-    public async Task<CheckCodeResult> CheckCodeAsync(PhoneNumber phoneNumber, string code)
+    /// <summary>
+    /// 驗證碼檢測
+    /// </summary>
+    /// <param name="phoneNumber"></param>
+    /// <param name="code"></param>
+    /// <returns></returns>
+    public async Task<CheckCodeResult> CheckPhoneCodeAsync(PhoneNumber phoneNumber, string code)
     {
         var user = await _userRepository.FindOneAsync(phoneNumber);
         if (user == null)
@@ -77,6 +95,30 @@ public class UserDomainService
             AccessFail(user);
             return CheckCodeResult.CodeError;
         }
+    }
+
+    /// <summary>
+    /// 寄送手機登入驗證碼
+    /// </summary>
+    /// <param name="phoneNumber"></param>
+    /// <returns></returns>
+    public async Task<UserAccessResult> SendCodeAsync(PhoneNumber phoneNumber)
+    {
+        var user = await _userRepository.FindOneAsync(phoneNumber);
+        if (user == null)
+        {
+            return UserAccessResult.PhoneNumberNotFound;
+        }
+
+        if (IsLockOut(user))
+        {
+            return UserAccessResult.LockOut;
+        }
+
+        string code = Random.Shared.Next(1000, 9999).ToString();
+        await _userRepository.SavePhoneCodeAsync(phoneNumber, code);
+        await _smsCodeSender.SendCodeAsync(phoneNumber, code);
+        return UserAccessResult.Ok;
     }
 
     public void ResetAccessFail(User user)
